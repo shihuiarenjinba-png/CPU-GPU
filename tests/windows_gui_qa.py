@@ -98,14 +98,18 @@ def source_ui(kind: str, folder: Path) -> dict:
             time.sleep(0.35)
             root.update()
             actual = (root.winfo_width(), root.winfo_height())
-            if actual != size:
-                raise RuntimeError(f"Requested Tk layout geometry {size} but got {actual}")
+            # Windows hosted VM can clamp full window to its work area (e.g. 768 -> 749).
+            # Record the real client size; never claim exact physical display-mode coverage.
+            if actual[0] < 700 or actual[1] < 460:
+                raise RuntimeError(f"Tk window unusably small in CI: requested={size}, actual={actual}")
             hwnd = int(user32.GetParent(root.winfo_id())) or root.winfo_id()
             file = folder / f"source_{kind}_{lang}_{size[0]}x{size[1]}.png"
             evidence = capture(hwnd, file)
             result["source_screenshots"].append(
                 {**evidence, "locale": lang, "requested_tk_client_size": list(size),
-                 "actual_tk_client_size": list(actual)})
+                 "actual_tk_client_size": list(actual),
+                 "exact_window_geometry": actual == size,
+                 "runner_desktop_size": [root.winfo_screenwidth(), root.winfo_screenheight()]})
         result["language_toggle"] = True
     finally:
         if kind in {"cpu", "ai"}:
