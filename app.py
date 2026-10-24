@@ -7,6 +7,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from monitor_core import Monitor, export_csv
+from dark_theme import CYAN, SOFT, apply_theme, dark_text, header, metric
 
 WORDS = {
     "ja": {
@@ -43,60 +44,60 @@ WORDS = {
 class Application:
     def __init__(self, root: tk.Tk):
         self.root = root
-        # Legibility-first desktop sizing; native Windows control styling, no external UI framework.
-        from tkinter import font as tkfont
-        tkfont.nametofont("TkDefaultFont").configure(family="Segoe UI", size=11)
-        style = ttk.Style(root)
-        style.configure(".", font=("Segoe UI", 11))
-        style.configure("TButton", padding=(12, 7))
-        style.configure("TNotebook.Tab", padding=(16, 8))
+        apply_theme(root, accent=CYAN)
         self.lang = "ja"
         self.monitor = Monitor(interval=2)
         self.messages: queue.Queue[dict] = queue.Queue()
         self.monitor.on_sample = self.messages.put
         self.last: dict | None = None
-        self.root.geometry("900x650")
+        self.root.geometry("980x700")
         self.root.minsize(740, 540)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
-        bar = ttk.Frame(root, padding=12)
+        self.hero_title, self.hero_subtitle = header(
+            root, "●  SYSTEM / PERFORMANCE", "CPU / GPU MONITOR",
+            "リアルタイム・ローカル診断  /  HARDWARE TELEMETRY",
+            right="LOCAL  •  READ ONLY")
+        bar = ttk.Frame(root, style="Toolbar.TFrame", padding=(14, 10))
         bar.pack(fill="x")
-        self.start_button = ttk.Button(bar, command=self.start)
+        self.start_button = ttk.Button(bar, command=self.start, style="Primary.TButton")
         self.start_button.pack(side="left", padx=4)
         self.stop_button = ttk.Button(bar, command=self.stop)
         self.stop_button.pack(side="left", padx=4)
         self.export_button = ttk.Button(bar, command=self.export)
         self.export_button.pack(side="left", padx=4)
-        self.clear_button = ttk.Button(bar, command=self.clear)
+        self.clear_button = ttk.Button(bar, command=self.clear, style="Quiet.TButton")
         self.clear_button.pack(side="left", padx=4)
-        self.language_button = ttk.Button(bar, command=self.switch_language)
+        self.language_button = ttk.Button(bar, command=self.switch_language, style="Quiet.TButton")
         self.language_button.pack(side="right", padx=4)
 
         self.status_var = tk.StringVar()
-        ttk.Label(root, textvariable=self.status_var, padding=(15, 0)).pack(anchor="w")
+        ttk.Label(root, textvariable=self.status_var, style="Status.TLabel", padding=(19, 4)).pack(anchor="w")
 
         self.tabs = ttk.Notebook(root)
         self.tabs.pack(fill="both", expand=True, padx=12, pady=10)
-        self.overview_tab = ttk.Frame(self.tabs, padding=16)
-        self.process_tab = ttk.Frame(self.tabs, padding=16)
+        self.overview_tab = ttk.Frame(self.tabs, style="Panel.TFrame", padding=15)
+        self.process_tab = ttk.Frame(self.tabs, style="Panel.TFrame", padding=15)
         self.tabs.add(self.overview_tab)
         self.tabs.add(self.process_tab)
+
         self.values = {}
         self.row_labels = {}
-        for name in ("cpu", "ram", "disk", "gpu", "vram", "temp", "history"):
-            frame = ttk.Frame(self.overview_tab)
-            frame.pack(fill="x", pady=7)
-            label = ttk.Label(frame, width=34)
-            label.pack(side="left")
-            value = ttk.Label(frame, font=("Segoe UI", 12, "bold"))
-            value.pack(side="left")
+        cards = ttk.Frame(self.overview_tab, style="Panel.TFrame")
+        cards.pack(fill="both", expand=True)
+        for col in range(3):
+            cards.columnconfigure(col, weight=1, uniform="metrics")
+        for idx, name in enumerate(("cpu", "ram", "gpu", "disk", "vram", "temp", "history")):
+            frame, label, value = metric(cards, name, accent=name in {"cpu", "gpu", "history"})
+            frame.grid(row=idx // 3, column=idx % 3, sticky="nsew", padx=5, pady=5)
             self.row_labels[name] = label
             self.values[name] = value
-        self.notice = ttk.Label(self.overview_tab, wraplength=700, justify="left")
-        self.notice.pack(anchor="w", pady=(22, 0))
-        self.process_head = ttk.Label(self.process_tab)
-        self.process_head.pack(anchor="w")
+        self.notice = ttk.Label(self.overview_tab, wraplength=780, justify="left", style="PanelText.TLabel")
+        self.notice.pack(anchor="w", pady=(12, 0))
+        self.process_head = ttk.Label(self.process_tab, style="PanelText.TLabel")
+        self.process_head.pack(anchor="w", pady=(2, 12))
         self.process_text = tk.Text(self.process_tab, wrap="none", height=12, state="disabled")
+        dark_text(self.process_text)
         self.process_text.pack(fill="both", expand=True, pady=8)
         self.translate()
         self.root.after(250, self.poll)
@@ -106,6 +107,7 @@ class Application:
 
     def translate(self):
         self.root.title(self.w("title"))
+        self.hero_subtitle.configure(text=("リアルタイム・ローカル診断  /  HARDWARE TELEMETRY" if self.lang == "ja" else "Local real-time diagnostics  /  HARDWARE TELEMETRY"))
         self.start_button.configure(text=self.w("start"))
         self.stop_button.configure(text=self.w("stop"))
         self.export_button.configure(text=self.w("export"))
