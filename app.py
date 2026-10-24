@@ -7,6 +7,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from monitor_core import Monitor, export_csv
+from telemetry_plot import draw_telemetry
 from dark_theme import CYAN, SOFT, apply_theme, dark_text, header, metric
 
 WORDS = {
@@ -92,6 +93,10 @@ class Application:
             frame.grid(row=idx // 3, column=idx % 3, sticky="nsew", padx=5, pady=5)
             self.row_labels[name] = label
             self.values[name] = value
+        self.live_chart = tk.Canvas(self.overview_tab, height=135, background=SOFT,
+                                    highlightthickness=1, highlightbackground="#30425A")
+        self.live_chart.pack(fill="x", pady=(9, 0))
+        self.live_chart.bind("<Configure>", lambda event: self.draw_live_chart())
         self.notice = ttk.Label(self.overview_tab, wraplength=780, justify="left", style="PanelText.TLabel")
         self.notice.pack(anchor="w", pady=(12, 0))
         self.process_head = ttk.Label(self.process_tab, style="PanelText.TLabel")
@@ -161,6 +166,12 @@ class Application:
         self.process_text.delete("1.0", "end")
         self.process_text.insert("1.0", "\n".join(lines))
         self.process_text.configure(state="disabled")
+        self.draw_live_chart()
+
+    def draw_live_chart(self):
+        draw_telemetry(self.live_chart, self.monitor.history,
+                       empty_label=("計測開始後に推移を表示します" if self.lang == "ja"
+                                    else "Start monitoring to see the trend"))
 
     def poll(self):
         changed = False
