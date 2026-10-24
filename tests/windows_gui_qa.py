@@ -110,6 +110,21 @@ def source_ui(kind: str, folder: Path) -> dict:
                  "actual_tk_client_size": list(actual),
                  "exact_window_geometry": actual == size,
                  "runner_desktop_size": [root.winfo_screenwidth(), root.winfo_screenheight()]})
+            if kind in {"cpu", "ai"}:
+                panel = controller.alert_panel
+                assert len(panel.tree.get_children()) >= 5, "Alert rules not rendered"
+                assert panel.tab.winfo_exists(), "Alerts panel not registered"
+                controller.tabs.select(panel.tab)
+                root.update()
+                time.sleep(0.2)
+                root.update()
+                alert_file = folder / f"source_{kind}_alerts_{lang}_{size[0]}x{size[1]}.png"
+                result["source_screenshots"].append({
+                    **capture(hwnd, alert_file), "locale": lang,
+                    "view": "editable_alert_rules", "windows_toast_verified": False
+                })
+                controller.tabs.select(0)
+                root.update()
         result["language_toggle"] = True
     finally:
         if kind in {"cpu", "ai"}:
