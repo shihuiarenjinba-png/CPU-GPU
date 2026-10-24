@@ -125,7 +125,10 @@ class Monitor:
             while not self.stop_event.is_set():
                 try:
                     record = self.sampler()
-                    self.history.append(record)
+                    # Retain only aggregate counters in memory. Process snapshots are
+                    # transient and delivered only to the current UI callback.
+                    self.history.append({key: value for key, value in record.items()
+                                         if key not in ("observed_processes", "top_processes")})
                     if self.on_sample:
                         self.on_sample(record)
                 except Exception as exc:
