@@ -214,7 +214,7 @@ class AlertPanel:
         for rule in self.rules:
             self.tree.insert("", "end", iid=rule.id,
                              values=(METRIC_TEXT[self.get_lang()][rule.metric],
-                                     int(rule.threshold) if rule.threshold.is_integer() else rule.threshold,
+                                     int(rule.threshold) if float(rule.threshold).is_integer() else rule.threshold,
                                      rule.duration_s, rule.cooldown_s,
                                      "ON" if rule.enabled else "OFF"))
         if selected and self.tree.exists(selected[0]):
