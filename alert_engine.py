@@ -78,14 +78,16 @@ def default_rules(*, ai: bool = False) -> list[Rule]:
         Rule("cpu_high", "cpu_percent", 85, 30, 300, "warning"),
         Rule("ram_high", "ram_percent", 90, 20, 300, "critical"),
         Rule("disk_full", "disk_percent", 95, 30, 600, "critical"),
-        Rule("gpu_high", "gpu_percent", 90, 30, 300, "warning", not ai),
-        Rule("vram_low", "vram_free_mib", 1024, 20, 300, "warning", not ai),
     ]
     if ai:
         rules += [
             Rule("ai_candidate", "ai_candidate_present", 1, 0, 300, "warning"),
             Rule("ai_cpu_high", "ai_cpu_high", 85, 30, 300, "critical"),
         ]
+    rules += [
+        Rule("gpu_high", "gpu_percent", 90, 30, 300, "warning", not ai),
+        Rule("vram_low", "vram_free_mib", 1024, 20, 300, "warning", not ai),
+    ]
     return rules
 
 
