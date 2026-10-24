@@ -151,7 +151,7 @@ class AlertPanel:
             cell.grid(row=0, column=col, padx=(0, 7), sticky="w")
             label = ttk.Label(cell, style="PanelText.TLabel")
             label.pack(anchor="w")
-            control.pack(anchor="w")
+            control.grid(row=1, column=col, sticky="w", padx=(0, 7))
             self.field_labels[name] = label
         ops = ttk.Frame(self.tab, style="Panel.TFrame")
         ops.pack(fill="x", pady=(2, 5))
