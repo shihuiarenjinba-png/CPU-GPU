@@ -16,6 +16,9 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Running a script inside tests/ excludes the repository root from sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import psutil
 from PIL import ImageGrab, ImageStat
 
@@ -25,6 +28,7 @@ user32.GetWindowTextW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_in
 user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
 user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
 user32.GetParent.argtypes = [ctypes.c_void_p]
+user32.GetParent.restype = ctypes.c_void_p
 
 
 def windows():
