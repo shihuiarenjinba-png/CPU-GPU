@@ -90,6 +90,8 @@ def default_rules(*, ai: bool = False) -> list[Rule]:
 
 
 def metric_value(sample: dict, name: str, target: str = "") -> float | None:
+    if name in ("process_present", "process_memory_mib") and "observed_processes" not in sample:
+        return None
     if name == "process_present":
         value = 1.0 if any(str(p.get("name") or "").casefold() == target.casefold()
                            for p in sample.get("observed_processes", ())) else 0.0
@@ -97,7 +99,7 @@ def metric_value(sample: dict, name: str, target: str = "") -> float | None:
         amounts = [float(p["memory_mib"]) for p in sample.get("observed_processes", ())
                    if str(p.get("name") or "").casefold() == target.casefold()
                    and isinstance(p.get("memory_mib"), (float, int))]
-        value = max(amounts) if amounts else None
+        value = max(amounts) if amounts else 0.0
     elif name == "vram_free_mib":
         used, total = sample.get("vram_used_mib"), sample.get("vram_total_mib")
         value = total - used if isinstance(used, (float, int)) and isinstance(total, (float, int)) else None
