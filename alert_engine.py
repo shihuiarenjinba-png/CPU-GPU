@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import tempfile
 import time
 from collections import deque
@@ -16,7 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 METRICS = ("cpu_percent", "ram_percent", "gpu_percent", "disk_percent",
-           "vram_free_mib", "ai_candidate_present", "ai_cpu_high")
+           "vram_free_mib", "ai_candidate_present", "ai_cpu_high",
+           "process_present", "process_memory_mib")
 PERCENT_METRICS = {"cpu_percent", "ram_percent", "gpu_percent", "disk_percent", "ai_cpu_high"}
 ALLOWED_LEVELS = ("warning", "critical")
 MAX_RULES = 16
@@ -31,6 +33,7 @@ class Rule:
     cooldown_s: int = 300
     level: str = "warning"
     enabled: bool = True
+    target: str = ""
 
     def validate(self):
         if not self.id.isascii() or not (1 <= len(self.id) <= 48) or not all(
@@ -40,10 +43,15 @@ class Rule:
             raise ValueError("Unsupported rule metric or severity")
         if not isinstance(self.threshold, (int, float)) or not math.isfinite(self.threshold):
             raise ValueError("Threshold must be finite")
-        upper = 65536 if self.metric == "vram_free_mib" else 100
+        upper = 65536 if self.metric in ("vram_free_mib", "process_memory_mib") else 100
         if not 0 <= self.threshold <= upper:
             raise ValueError("Threshold out of range")
-        if self.metric == "ai_candidate_present" and self.threshold != 1:
+        if self.metric in ("process_present", "process_memory_mib"):
+            if not re.fullmatch(r"[A-Za-z0-9._ -]{1,80}", self.target):
+                raise ValueError("Process rule needs a simple executable name")
+        elif self.target:
+            raise ValueError("Target is allowed only for process rules")
+        if self.metric in ("process_present", "ai_candidate_present") and self.threshold != 1:
             raise ValueError("AI process detection must have threshold 1")
         if not isinstance(self.duration_s, int) or not 0 <= self.duration_s <= 3600:
             raise ValueError("Duration must be 0-3600 seconds")
@@ -81,8 +89,16 @@ def default_rules(*, ai: bool = False) -> list[Rule]:
     return rules
 
 
-def metric_value(sample: dict, name: str) -> float | None:
-    if name == "vram_free_mib":
+def metric_value(sample: dict, name: str, target: str = "") -> float | None:
+    if name == "process_present":
+        value = 1.0 if any(str(p.get("name") or "").casefold() == target.casefold()
+                           for p in sample.get("observed_processes", ())) else 0.0
+    elif name == "process_memory_mib":
+        amounts = [float(p["memory_mib"]) for p in sample.get("observed_processes", ())
+                   if str(p.get("name") or "").casefold() == target.casefold()
+                   and isinstance(p.get("memory_mib"), (float, int))]
+        value = max(amounts) if amounts else None
+    elif name == "vram_free_mib":
         used, total = sample.get("vram_used_mib"), sample.get("vram_total_mib")
         value = total - used if isinstance(used, (float, int)) and isinstance(total, (float, int)) else None
     elif name == "ai_candidate_present":
@@ -143,7 +159,7 @@ class AlertEngine:
             if not rule.enabled:
                 st.update(since=None, active=False, last=None)
                 continue
-            val = metric_value(sample, rule.metric)
+            val = metric_value(sample, rule.metric, rule.target)
             if val is None:
                 # Unavailable is NOT zero / normal, and must not trigger recovery.
                 st.update(since=None, active=False, last=None)
