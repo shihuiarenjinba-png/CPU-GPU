@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from monitor_core import Monitor, export_csv
 from telemetry_plot import draw_telemetry
+from alert_ui import AlertPanel
 from dark_theme import CYAN, SOFT, apply_theme, dark_text, header, metric
 
 WORDS = {
@@ -81,6 +82,12 @@ class Application:
         self.process_tab = ttk.Frame(self.tabs, style="Panel.TFrame", padding=15)
         self.tabs.add(self.overview_tab)
         self.tabs.add(self.process_tab)
+        self.alert_text = tk.StringVar(value="")
+        ttk.Label(root, textvariable=self.alert_text, style="Status.TLabel",
+                  padding=(19, 1)).pack(anchor="w", before=self.tabs)
+        self.alert_panel = AlertPanel(root, self.tabs, "CPU_GPU_Monitor",
+                                      lambda: self.lang, accent=CYAN,
+                                      on_status=self.alert_text.set)
 
         self.values = {}
         self.row_labels = {}
@@ -120,6 +127,7 @@ class Application:
         self.language_button.configure(text=self.w("language"))
         self.tabs.tab(self.overview_tab, text=self.w("overview"))
         self.tabs.tab(self.process_tab, text=self.w("processes"))
+        self.alert_panel.refresh_locale()
         self.notice.configure(text=self.w("notice"))
         self.process_head.configure(text=self.w("process_head"))
         for key, label in self.row_labels.items():
@@ -131,11 +139,13 @@ class Application:
         self.translate()
 
     def start(self):
+        self.alert_panel.engine.clear_runtime()
         self.monitor.start()
         self.refresh()
 
     def stop(self):
         self.monitor.stop()
+        self.alert_panel.engine.clear_runtime()
         self.refresh()
 
     def refresh(self):
@@ -178,6 +188,8 @@ class Application:
         try:
             while True:
                 self.last = self.messages.get_nowait()
+                if self.monitor.thread and self.monitor.thread.is_alive():
+                    self.alert_panel.on_sample(self.last)
                 changed = True
         except queue.Empty:
             pass
