@@ -37,6 +37,57 @@ jobs:
       - name: Real Windows GUI screenshots and packaged EXE smoke QA
         shell: pwsh
         run: python tests/windows_gui_qa.py --kind cpu --exe "dist/CPU_GPU_Monitor_QA_UNSIGNED.exe" --out qa_evidence
+      - name: Stage styled QA_ONLY MSIX with explicit TEST identity
+        shell: pwsh
+        run: |
+          python store/package_msix.py --product cpu --exe "dist/CPU_GPU_Monitor_QA_UNSIGNED.exe" --layout "dist/QA_ONLY_LAYOUT" --provenance "dist/QA_ONLY_provenance.json"
+      - name: MakeAppx pack/unpack and verify embedded EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdk = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
+          $tool = Get-ChildItem -Path $sdk -Filter MakeAppx.exe -Recurse -ErrorAction Stop |
+             Where-Object { $_.FullName -match '[\\/]x64[\\/]MakeAppx.exe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPU_GPU_Windows_GUI_QA_EVIDENCE
+          path: qa_evidence/
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CPU_GPU_QA_UNSIGNED_Windows_x64
+          path: dist/CPU_GPU_Monitor_QA_UNSIGNED.exe
+          if-no-files-found: error
+          retention-days: 7
+ } |
+             Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$tool) { throw 'Windows SDK MakeAppx.exe x64 unavailable' }
+          Write-Host "MakeAppx: $($tool.FullName)"
+          & $tool.FullName pack /d "dist/QA_ONLY_LAYOUT" /p "dist/CPU_GPU_Monitor_QA_UNSIGNED_x64.msix" /o
+          if ($LASTEXITCODE -ne 0) { throw "MSIX pack failed: $LASTEXITCODE" }
+          & $tool.FullName unpack /p "dist/CPU_GPU_Monitor_QA_UNSIGNED_x64.msix" /d "dist/QA_UNPACK_VERIFY" /o
+          if ($LASTEXITCODE -ne 0) { throw "MSIX unpack failed: $LASTEXITCODE" }
+          $original=(Get-FileHash "dist/CPU_GPU_Monitor_QA_UNSIGNED.exe" -Algorithm SHA256).Hash
+          $embedded=(Get-FileHash "dist/QA_UNPACK_VERIFY/CPU_GPU_Monitor.exe" -Algorithm SHA256).Hash
+          if ($original -ne $embedded) { throw 'MSIX embedded EXE bytes differ from QA-tested EXE' }
+          $manifest=Get-Content "dist/QA_UNPACK_VERIFY/AppxManifest.xml" -Raw
+          if ($manifest -notmatch 'QATEST\\.' -or $manifest -notmatch 'UNSIGNED-NOT-FOR-STORE') { throw 'QA-only identity marker missing in packed manifest' }
+          $file=Get-FileHash "dist/CPU_GPU_Monitor_QA_UNSIGNED_x64.msix" -Algorithm SHA256
+          Write-Host "Embedded EXE SHA256: $embedded"
+          Write-Host "MSIX SHA256: $($file.Hash)"
+          $file.Hash | Out-File "dist/QA_ONLY_msix_sha256.txt"
+      - name: Upload QA_ONLY unsigned MSIX and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPU_GPU_Monitor_QA_UNSIGNED_NOT_FOR_STORE_MSIX_x64
+          path: |
+            dist/CPU_GPU_Monitor_QA_UNSIGNED_x64.msix
+            dist/QA_ONLY_provenance.json
+            dist/QA_ONLY_msix_sha256.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload Windows GUI evidence (including failures)
         if: always()
         uses: actions/upload-artifact@v4
