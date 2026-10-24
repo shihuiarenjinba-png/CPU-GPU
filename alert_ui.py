@@ -114,14 +114,19 @@ class AlertPanel:
         style.map("Alert.Treeview", background=[("selected", "#284360")],
                   foreground=[("selected", TEXT)])
         style.configure("Alert.Treeview.Heading", background="#25364A", foreground=TEXT)
-        self.tree = ttk.Treeview(self.tab, style="Alert.Treeview",
+        tree_area = ttk.Frame(self.tab, style="Panel.TFrame")
+        tree_area.pack(fill="x")
+        self.tree = ttk.Treeview(tree_area, style="Alert.Treeview",
                                  columns=("metric", "threshold", "duration", "repeat", "state"),
                                  show="headings", height=5, selectmode="browse")
         for key, width in (("metric", 240), ("threshold", 90), ("duration", 110),
                            ("repeat", 120), ("state", 90)):
             self.tree.column(key, width=width, minwidth=65,
                              stretch=key == "metric", anchor="w")
-        self.tree.pack(fill="x")
+        self.tree.pack(side="left", fill="x", expand=True)
+        scroll = ttk.Scrollbar(tree_area, orient="vertical", command=self.tree.yview)
+        scroll.pack(side="right", fill="y")
+        self.tree.configure(yscrollcommand=scroll.set)
         self.tree.bind("<<TreeviewSelect>>", self.selected)
 
         editor = ttk.Frame(self.tab, style="Panel.TFrame")
