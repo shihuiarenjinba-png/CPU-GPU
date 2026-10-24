@@ -31,6 +31,20 @@ jobs:
           pyinstaller --noconfirm --clean --onefile --windowed --name CPU_GPU_Monitor_QA_UNSIGNED app.py
           if (!(Test-Path "dist/CPU_GPU_Monitor_QA_UNSIGNED.exe")) { throw "EXE missing" }
           Get-FileHash "dist/CPU_GPU_Monitor_QA_UNSIGNED.exe" -Algorithm SHA256 | Format-List
+      - name: Install Windows GUI QA dependencies
+        shell: pwsh
+        run: python -m pip install "psutil>=7.1,<8" "pillow>=11.2,<13"
+      - name: Real Windows GUI screenshots and packaged EXE smoke QA
+        shell: pwsh
+        run: python tests/windows_gui_qa.py --kind cpu --exe "dist/CPU_GPU_Monitor_QA_UNSIGNED.exe" --out qa_evidence
+      - name: Upload Windows GUI evidence (including failures)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPU_GPU_Windows_GUI_QA_EVIDENCE
+          path: qa_evidence/
+          if-no-files-found: warn
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: CPU_GPU_QA_UNSIGNED_Windows_x64
