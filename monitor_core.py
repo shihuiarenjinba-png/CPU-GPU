@@ -75,6 +75,7 @@ def sample(*, disk: str | Path | None = None, gpu_reader=gpu_snapshot) -> dict:
               "cpu_percent": cpu, "ram_percent": float(mem.percent),
               "ram_used_bytes": int(mem.used), "ram_total_bytes": int(mem.total),
               "disk_percent": float(disk_usage.percent), "top_processes": processes[:10],
+              "observed_processes": processes,
               "cpu_temp_c": None, "cpu_temp_status": "UNAVAILABLE"}
     result.update(gpu_reader())
     return result
