@@ -279,7 +279,13 @@ class AlertPanel:
 
     def save(self):
         try:
-            # Explicit Apply/Save means disabled/unapplied edits aren't silently activated.
+            # Save applies the currently visible editor fields too, avoiding a hidden
+            # two-button commit process for first-time users.
+            chosen = self.tree.selection()
+            if chosen:
+                updated = self.parse_rule(chosen[0])
+                self.rules = [updated if r.id == chosen[0] else r for r in self.rules]
+                self.refresh_rules()
             tested = AlertEngine(self.rules)
             save_rules(self.product, self.rules, bool(self.enabled_var.get()),
                        bool(self.toasts_var.get()))
@@ -310,7 +316,16 @@ class AlertPanel:
             stamp = datetime.now().strftime("%H:%M:%S")
             text = f"{self.w(kind)} · {metric}: {event.value:g}"
             if event.metric == "ai_candidate_present":
+                names = sorted({str(p.get("name", ""))[:60]
+                                for p in sample.get("local_ai_related_process_candidates", ())
+                                if p.get("name")})
+                if names:
+                    text += " · " + ", ".join(names[:3])
                 text += " · " + self.w("ai_notice")
+            elif event.metric in ("process_present", "process_memory_mib"):
+                target = next((r.target for r in self.rules if r.id == event.rule_id), "")
+                if target:
+                    text += " · " + target
             self.log.insert(0, f"[{stamp}] {text}")
             if self.log.size() > 200:
                 self.log.delete(200, "end")
