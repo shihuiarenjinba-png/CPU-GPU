@@ -80,6 +80,28 @@ def source_ui(kind: str, folder: Path) -> dict:
             root.update()
             assert not (controller.monitor.thread.is_alive() if kind == "cpu" else controller.monitor.worker.is_alive())
             result["start_stop"] = "PASS"
+            # Validate the actual GUI notification wiring using a clearly synthetic
+            # QA sample. No Windows toast, file modification or false sensor claim.
+            from alert_engine import AlertEngine, Rule
+            panel = controller.alert_panel
+            assert panel.log.size() == 0, "Alert history must start empty"
+            assert not panel.toasts, "OS notifications must start OFF by default"
+            was_enabled, was_engine = panel.enabled, panel.engine
+            panel.enabled = True
+            panel.toasts = False
+            panel.engine = AlertEngine([Rule("synthetic_qa", "cpu_percent", 50, 0)])
+            panel.on_sample({"cpu_percent": 99})
+            root.update()
+            assert panel.log.size() == 1, "Synthetic threshold did not trigger in-app alert"
+            panel.on_sample({"cpu_percent": 99})
+            assert panel.log.size() == 1, "Notification cooldown did not suppress repeat"
+            panel.on_sample({"cpu_percent": 0})
+            assert panel.log.size() == 2, "Recovery event not rendered"
+            result["synthetic_in_app_alert_and_recovery"] = "PASS"
+            for win in root.winfo_children():
+                if isinstance(win, tk.Toplevel):
+                    win.destroy()
+            panel.enabled, panel.engine = was_enabled, was_engine
         else:
             assert not controller.running, "Whisper should open idle"
             result["start_stop"] = "idle / no model supplied"
